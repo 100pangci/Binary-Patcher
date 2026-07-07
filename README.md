@@ -1,4 +1,8 @@
 # Binary Patcher
+
+![CI](https://github.com/100pangci/binary_patcher/actions/workflows/ci.yml/badge.svg)
+![Build](https://github.com/100pangci/binary_patcher/actions/workflows/build.yml/badge.svg)
+
 这是一个用于生成和应用二进制补丁项目，并支持整目录补丁工作流。项目现已统一通过 HDiffPatch (`hdiffz` / `hpatchz`) 处理补丁生成与应用。
 
 支持：
@@ -13,14 +17,25 @@
 
 ```text
 .
-├─ .github/workflows/      # GitHub Actions 自动构建
-├─ scripts/                # 构建脚本
-├─ src/                    # Python 源码
-├─ src/legacy              # 项目之前的源码，使用的旧方案
+├─ .github/workflows/
+│   ├─ ci.yml          # 每次 push/PR: ruff lint + pytest (3.10/3.11/3.12)
+│   └─ build.yml       # tag v*: lint → test → Nuitka 构建 → Release
+├─ scripts/
+│   ├─ build.py        # Nuitka 打包 + HDiffPatch 自动下载
+│   └─ build.bat       # Windows 一键构建入口
+├─ src/
+│   ├─ binary_patcher.py     # 核心命令行工具 (补丁生成)
+│   ├─ apply_patch.py        # 自动补丁应用脚本
+│   ├─ rollback_patch.py     # 自动补丁回滚脚本
+│   ├─ hdiffpatch_utils.py   # HDiffPatch 工具查找与调用封装
+│   └─ legacy/               # 旧版实现 (bsdiff4)
+├─ tests/
+│   └─ test_binary_patcher.py  # 45 个单元测试
 ├─ .gitignore
-├─ pyproject.toml
+├─ pyproject.toml            # 项目元数据 + ruff/pytest 配置
 ├─ requirements.txt
-└─ requirements-build.txt
+├─ requirements-build.txt    # Nuitka 构建依赖
+└─ requirements-test.txt     # pytest 测试依赖
 ```
 
 ## 主要文件说明
@@ -28,8 +43,16 @@
 - `src/binary_patcher.py`：核心命令行工具
 - `src/apply_patch.py`：面向最终用户的自动补丁脚本
 - `src/rollback_patch.py`：面向最终用户的自动回滚脚本
+- `src/hdiffpatch_utils.py`：HDiffPatch 工具查找封装、线程数推荐、subprocess 超时控制
 - `scripts/build.py`：统一构建与发布整理脚本
 - `scripts/build.bat`：Windows 下一键构建入口
+
+## 安全特性
+
+- **路径穿越防护**: 所有 manifest 中的路径均经过 `resolve_safe_path()` 校验，拒绝 `../` 逃逸
+- **Manifest 校验**: 加载时验证字段完整性和类型，拒绝格式错误的恶意清单
+- **备份安全**: 多次打补丁时备份文件使用**时间戳后缀**，不再静默覆盖
+- **SHA256 校验**: 补丁应用前后均校验文件完整性，失败自动回滚并恢复备份
 
 ## 下载什么？
 
@@ -157,8 +180,50 @@ scripts\build.bat
 
 ---
 
-## 五、GitHub Actions
+## 五、CI / CD
 
-项目已支持自动构建 Windows 发布包，工作流文件位于：
+项目使用 GitHub Actions 自动执行持续集成与发布构建。
 
-- `.github/workflows/build.yml`
+### CI 流水线 (`ci.yml`)
+
+每次 push 到任意分支 或 PR 到 `main` 时触发：
+
+| Job | 环境 | 内容 |
+|-----|------|------|
+| **lint** | ubuntu | `ruff check src/ tests/` |
+| **test (3.10, 3.11, 3.12)** | ubuntu | `pytest tests/ -v`（45 项测试） |
+
+### 发布流水线 (`build.yml`)
+
+推送 tag `v*` 或手动触发时执行：
+
+```
+lint → test (3.10/3.11/3.12) → Nuitka 构建 (Windows) → GitHub Release
+```
+
+### 本地运行测试
+
+```bash
+pip install -r requirements-test.txt
+pytest tests/ -v
+```
+
+### 本地代码检查
+
+```bash
+pip install ruff
+ruff check src/ tests/
+```
+
+---
+
+## 六、技术栈
+
+| 领域 | 选型 |
+|------|------|
+| 语言 | Python ≥ 3.10 |
+| 打包工具 | Nuitka (单文件 exe) |
+| 补丁引擎 | HDiffPatch (hdiffz / hpatchz) |
+| 测试框架 | pytest |
+| 代码检查 | ruff |
+| CI/CD | GitHub Actions |
