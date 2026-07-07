@@ -1,8 +1,10 @@
 # apply_patch.py
+import hashlib
 import json
-from pathlib import Path
 import shutil
 import sys
+import time
+from pathlib import Path
 
 from hdiffpatch_utils import run_hpatchz
 
@@ -27,9 +29,37 @@ def pause_and_exit(exit_code=0):
     sys.exit(exit_code)
 
 
-def sha256_of_file(file_path):
-    import hashlib
+def resolve_safe_path(base_dir, relative_path):
+    base_resolved = Path(base_dir).resolve()
+    target = (base_resolved / relative_path).resolve()
+    try:
+        target.relative_to(base_resolved)
+    except ValueError:
+        raise ValueError(f"路径穿越检测: {relative_path} 解析后超出基础目录")
+    return target
 
+
+def validate_manifest(manifest):
+    if not isinstance(manifest, dict):
+        raise ValueError("manifest 格式错误: 应为 JSON 对象")
+    for key in ("changed", "added", "deleted"):
+        if not isinstance(manifest.get(key), list):
+            raise ValueError(f"manifest 格式错误: '{key}' 应为数组")
+    for idx, item in enumerate(manifest.get("changed", [])):
+        for field in ("path", "old_sha256", "new_sha256", "patch_file"):
+            if field not in item:
+                raise ValueError(f"manifest changed[{idx}] 缺少字段 '{field}'")
+    for idx, item in enumerate(manifest.get("added", [])):
+        for field in ("path", "new_sha256", "file"):
+            if field not in item:
+                raise ValueError(f"manifest added[{idx}] 缺少字段 '{field}'")
+    for idx, item in enumerate(manifest.get("deleted", [])):
+        for field in ("path", "old_sha256"):
+            if field not in item:
+                raise ValueError(f"manifest deleted[{idx}] 缺少字段 '{field}'")
+
+
+def sha256_of_file(file_path):
     hasher = hashlib.sha256()
     with open(file_path, "rb") as file_obj:
         for chunk in iter(lambda: file_obj.read(1024 * 1024), b""):
@@ -59,7 +89,9 @@ def apply_binary_patch(old_file_path, patch_file_path, output_file_path):
 def create_backup(target_path):
     backup_path = target_path.with_name(target_path.name + BACKUP_SUFFIX)
     if backup_path.exists():
-        backup_path.unlink()
+        backup_path = target_path.with_name(
+            target_path.name + BACKUP_SUFFIX + f".{int(time.time())}"
+        )
     shutil.copy2(target_path, backup_path)
     return backup_path
 
@@ -80,6 +112,11 @@ def main():
         pause_and_exit(1)
 
     manifest = load_manifest(patch_dir)
+    try:
+        validate_manifest(manifest)
+    except ValueError as e:
+        print(f"错误: {e}")
+        pause_and_exit(1)
 
     changed = manifest.get("changed", [])
     added = manifest.get("added", [])
@@ -89,8 +126,12 @@ def main():
 
     for item in changed:
         relative_path = item["path"]
-        target_path = base_dir / Path(relative_path)
-        patch_file = patch_dir / Path(item["patch_file"])
+        try:
+            target_path = resolve_safe_path(base_dir, relative_path)
+            patch_file = resolve_safe_path(patch_dir, item["patch_file"])
+        except ValueError as e:
+            print(f"错误: {e}")
+            pause_and_exit(1)
 
         if not target_path.exists():
             print(f"错误: 缺少需要打补丁的旧文件: {target_path}")
@@ -118,8 +159,12 @@ def main():
 
     for item in added:
         relative_path = item["path"]
-        source_file = patch_dir / Path(item["file"])
-        target_path = base_dir / Path(relative_path)
+        try:
+            target_path = resolve_safe_path(base_dir, relative_path)
+            source_file = resolve_safe_path(patch_dir, item["file"])
+        except ValueError as e:
+            print(f"错误: {e}")
+            pause_and_exit(1)
         print(f"[新增] {relative_path}")
         ensure_parent_dir(target_path)
         shutil.copy2(source_file, target_path)
@@ -131,7 +176,11 @@ def main():
 
     for item in deleted:
         relative_path = item["path"]
-        target_path = base_dir / Path(relative_path)
+        try:
+            target_path = resolve_safe_path(base_dir, relative_path)
+        except ValueError as e:
+            print(f"错误: {e}")
+            pause_and_exit(1)
         if target_path.exists():
             backup_path = create_backup(target_path)
             print(f"[删除] {relative_path}")

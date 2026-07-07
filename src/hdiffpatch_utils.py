@@ -67,10 +67,23 @@ def get_recommended_thread_count() -> int:
     return max(1, cpu_count - 1)
 
 
+def _run_subprocess(cmd: list[str], description: str) -> None:
+    try:
+        subprocess.run(cmd, check=True, timeout=300, capture_output=True, text=True)
+    except subprocess.TimeoutExpired:
+        print(f"错误: {description} 超时 (300s)", file=sys.stderr)
+        sys.exit(1)
+    except subprocess.CalledProcessError as e:
+        print(f"错误: {description} 失败 (返回码 {e.returncode})", file=sys.stderr)
+        if e.stderr:
+            print(e.stderr.strip(), file=sys.stderr)
+        sys.exit(1)
+
+
 def run_hdiffz(old_file_path, new_file_path, patch_file_path) -> int:
     executable = find_hdiffpatch_tool(HDIFFZ_NAME)
     thread_count = get_recommended_thread_count()
-    subprocess.run(
+    _run_subprocess(
         [
             executable,
             f"-p-{thread_count}",
@@ -78,14 +91,14 @@ def run_hdiffz(old_file_path, new_file_path, patch_file_path) -> int:
             str(new_file_path),
             str(patch_file_path),
         ],
-        check=True,
+        f"HDiffPatch ({Path(patch_file_path).name})",
     )
     return thread_count
 
 
 def run_hpatchz(old_file_path, patch_file_path, output_file_path) -> None:
     executable = find_hdiffpatch_tool(HPATCHZ_NAME)
-    subprocess.run(
+    _run_subprocess(
         [
             executable,
             "-f",
@@ -93,5 +106,5 @@ def run_hpatchz(old_file_path, patch_file_path, output_file_path) -> None:
             str(patch_file_path),
             str(output_file_path),
         ],
-        check=True,
+        f"应用补丁 ({Path(patch_file_path).name})",
     )

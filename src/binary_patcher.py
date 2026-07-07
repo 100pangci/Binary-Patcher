@@ -6,7 +6,7 @@ import shutil
 from pathlib import Path
 import sys
 
-from hdiffpatch_utils import run_hdiffz, run_hpatchz
+from hdiffpatch_utils import _bundled_base_dir, run_hdiffz, run_hpatchz
 
 
 WORKSPACE_DIRS = ("Old", "New", "Patch")
@@ -18,7 +18,14 @@ HDIFFPATCH_HELPER_NAME = "hdiffpatch_utils.py"
 
 
 def format_size(size_bytes):
-    return f"{size_bytes / 1024:.2f} KB"
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    elif size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.2f} KB"
+    elif size_bytes < 1024 * 1024 * 1024:
+        return f"{size_bytes / (1024 * 1024):.2f} MB"
+    else:
+        return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
 
 
 def ensure_parent_dir(file_path):
@@ -150,24 +157,33 @@ def write_patch_instructions(patch_dir):
     (patch_dir / INSTRUCTIONS_NAME).write_text(instructions, encoding="utf-8")
 
 
+def _find_script(script_name):
+    source = Path(__file__).with_name(script_name)
+    if source.exists():
+        return source
+    if getattr(sys, "frozen", False):
+        source = _bundled_base_dir() / script_name
+        if source.exists():
+            return source
+    return None
+
+
 def copy_applier_script(patch_dir):
-    script_source = Path(__file__).with_name(APPLIER_SCRIPT_NAME)
-    if script_source.exists():
-        shutil.copy2(script_source, patch_dir / APPLIER_SCRIPT_NAME)
-
-    rollback_source = Path(__file__).with_name(ROLLBACK_SCRIPT_NAME)
-    if rollback_source.exists():
-        shutil.copy2(rollback_source, patch_dir / ROLLBACK_SCRIPT_NAME)
-
-    helper_source = Path(__file__).with_name(HDIFFPATCH_HELPER_NAME)
-    if helper_source.exists():
-        shutil.copy2(helper_source, patch_dir / HDIFFPATCH_HELPER_NAME)
+    for script_name in (APPLIER_SCRIPT_NAME, ROLLBACK_SCRIPT_NAME, HDIFFPATCH_HELPER_NAME):
+        source = _find_script(script_name)
+        if source:
+            shutil.copy2(source, patch_dir / script_name)
+        else:
+            print(f"警告: 未找到 {script_name}，请手动复制到补丁目录")
 
     for binary_name in ("hpatchz.exe", "hdiffz.exe"):
         candidate_paths = [
             Path(__file__).resolve().parent.parent / "bin" / binary_name,
             Path.cwd() / "bin" / binary_name,
         ]
+        if getattr(sys, "frozen", False):
+            candidate_paths.append(_bundled_base_dir() / binary_name)
+            candidate_paths.append(_bundled_base_dir() / "bin" / binary_name)
         for candidate in candidate_paths:
             if candidate.exists():
                 shutil.copy2(candidate, patch_dir / binary_name)

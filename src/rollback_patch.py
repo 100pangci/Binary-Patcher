@@ -1,11 +1,22 @@
 import json
-from pathlib import Path
 import shutil
 import sys
+from pathlib import Path
 
+from hdiffpatch_utils import _bundled_base_dir
 
 MANIFEST_NAME = "manifest.json"
 BACKUP_SUFFIX = ".backup_before_patch"
+
+
+def resolve_safe_path(base_dir, relative_path):
+    base_resolved = Path(base_dir).resolve()
+    target = (base_resolved / relative_path).resolve()
+    try:
+        target.relative_to(base_resolved)
+    except ValueError:
+        raise ValueError(f"路径穿越检测: {relative_path} 解析后超出基础目录")
+    return target
 
 
 def print_header(title):
@@ -88,21 +99,33 @@ def main():
 
     for item in changed:
         relative_path = item["path"]
-        target_path = base_dir / Path(relative_path)
+        try:
+            target_path = resolve_safe_path(base_dir, relative_path)
+        except ValueError as e:
+            print(f"错误: {e}")
+            pause_and_exit(1)
         print(f"[恢复变更] {relative_path}")
         if restore_backup_file(target_path):
             restored_count += 1
 
     for item in deleted:
         relative_path = item["path"]
-        target_path = base_dir / Path(relative_path)
+        try:
+            target_path = resolve_safe_path(base_dir, relative_path)
+        except ValueError as e:
+            print(f"错误: {e}")
+            pause_and_exit(1)
         print(f"[恢复删除] {relative_path}")
         if restore_backup_file(target_path):
             restored_count += 1
 
     for item in added:
         relative_path = item["path"]
-        target_path = base_dir / Path(relative_path)
+        try:
+            target_path = resolve_safe_path(base_dir, relative_path)
+        except ValueError as e:
+            print(f"错误: {e}")
+            pause_and_exit(1)
         print(f"[删除新增] {relative_path}")
         if remove_added_file(target_path):
             removed_count += 1

@@ -183,6 +183,10 @@ def build_executable(script_path: Path, exe_name: str) -> Path:
         include_data_args.append(
             f"--include-data-files={binary}={BINARY_DESTINATION}/{binary.name}"
         )
+    if exe_name == "binary_patcher":
+        for helper_file in ("apply_patch.py", "rollback_patch.py", "hdiffpatch_utils.py"):
+            helper_path = SRC_DIR / helper_file
+            include_data_args.append(f"--include-data-files={helper_path}={helper_file}")
 
     command = [
         sys.executable,
