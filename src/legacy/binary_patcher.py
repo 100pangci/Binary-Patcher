@@ -1,7 +1,6 @@
 # binary_patcher.py
 import argparse
 import sys
-import os
 import bsdiff4
 
 def create_patch(old_file_path, new_file_path, patch_file_path):

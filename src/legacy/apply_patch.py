@@ -193,7 +193,7 @@ def main():
                 shutil.move(backup_path, source_path)
                 print(f"      原始文件 '{os.path.basename(source_path)}' 已从备份中恢复。")
             else:
-                print(f"      由于源文件本身就是备份，恢复操作已跳过。")
+                print("      由于源文件本身就是备份，恢复操作已跳过。")
                 print(f"      失败生成的文件 '{os.path.basename(target_path)}' 已被删除。")
 
         pause_and_exit(1)
@@ -226,7 +226,7 @@ if __name__ == '__main__':
         # 切换工作目录到脚本所在目录，确保相对路径正确
         os.chdir(os.path.dirname(os.path.abspath(sys.argv[0])))
         main()
-    except Exception as e:
+    except Exception:
         print("\n发生了一个未预料到的严重错误！")
         import traceback
         traceback.print_exc()

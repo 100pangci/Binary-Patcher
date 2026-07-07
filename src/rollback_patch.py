@@ -3,8 +3,6 @@ import shutil
 import sys
 from pathlib import Path
 
-from hdiffpatch_utils import _bundled_base_dir
-
 MANIFEST_NAME = "manifest.json"
 BACKUP_SUFFIX = ".backup_before_patch"
 
