@@ -104,11 +104,18 @@ class TestFullWorkflow:
         for item in manifest["added"]:
             assert (patch_dir / item["file"]).exists()
 
-        # scripts → root,  binaries → Patch/
+        # Default: no .py scripts at root
         for script in ("apply_patch.py", "rollback_patch.py", "hdiffpatch_utils.py"):
-            assert (tmp_path / script).exists(), f"Script not at root: {script}"
+            assert not (tmp_path / script).exists(), f"Script should not be at root by default: {script}"
 
         assert (patch_dir / "README.txt").exists()
+
+    def test_copy_scripts_releases_py_files(self, tmp_path):
+        old_dir, new_dir = _build_workspace(tmp_path)
+        binary_patcher.build_patch_bundle(tmp_path, copy_scripts=True)
+
+        for script in ("apply_patch.py", "rollback_patch.py", "hdiffpatch_utils.py"):
+            assert (tmp_path / script).exists(), f"Script not at root: {script}"
 
     def test_unchanged_files_not_in_manifest(self, tmp_path):
         old_dir = tmp_path / "Old"

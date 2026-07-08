@@ -146,16 +146,23 @@ def apply_patch(old_file_path, patch_file_path, output_file_path):
         sys.exit(1)
 
 
-def write_patch_instructions(patch_dir):
-    instructions = (
-        "这是由 binary_patcher 自动生成的整包补丁目录。\n\n"
-        "使用方式：\n"
-        "1. 将整个 Patch 文件夹复制到旧版本根目录。\n"
-        "2. 将 apply_patch.py / rollback_patch.py 也放到旧版本根目录。\n"
-        "3. 运行 apply_patch.py（需 Python 环境）或下载 Release 中的 apply_patch.exe 双击运行。\n"
-        "4. 程序会按 manifest.json 和原始目录结构自动完成补丁应用。\n"
-    )
-    (patch_dir / INSTRUCTIONS_NAME).write_text(instructions, encoding="utf-8")
+def write_patch_instructions(patch_dir, copy_scripts=False):
+    lines = [
+        "这是由 binary_patcher 自动生成的整包补丁目录。",
+        "",
+        "使用方式：",
+        "1. 将整个 Patch 文件夹复制到旧版本根目录。",
+    ]
+    if copy_scripts:
+        lines.extend([
+            "2. 将同目录下的 apply_patch.py / rollback_patch.py 也放到旧版本根目录。",
+            "3. 运行 apply_patch.py（需 Python 环境）或下载 Release 中的 apply_patch.exe 双击运行。",
+        ])
+    else:
+        lines.append("2. 下载 Release 中的 apply_patch.exe 放到旧版本根目录并双击运行。")
+    lines.append("3. 程序会按 manifest.json 和原始目录结构自动完成补丁应用。" if not copy_scripts
+                 else "4. 程序会按 manifest.json 和原始目录结构自动完成补丁应用。")
+    (patch_dir / INSTRUCTIONS_NAME).write_text("\n".join(lines), encoding="utf-8")
 
 
 def _find_script(script_name):
@@ -169,13 +176,14 @@ def _find_script(script_name):
     return None
 
 
-def copy_applier_script(base_dir, patch_dir):
-    for script_name in (APPLIER_SCRIPT_NAME, ROLLBACK_SCRIPT_NAME, HDIFFPATCH_HELPER_NAME):
-        source = _find_script(script_name)
-        if source:
-            shutil.copy2(source, base_dir / script_name)
-        else:
-            print(f"警告: 未找到 {script_name}，请手动复制到补丁目录")
+def copy_applier_script(base_dir, patch_dir, copy_scripts=False):
+    if copy_scripts:
+        for script_name in (APPLIER_SCRIPT_NAME, ROLLBACK_SCRIPT_NAME, HDIFFPATCH_HELPER_NAME):
+            source = _find_script(script_name)
+            if source:
+                shutil.copy2(source, base_dir / script_name)
+            else:
+                print(f"警告: 未找到 {script_name}，请手动复制到补丁目录")
 
     for binary_name in ("hpatchz.exe", "hdiffz.exe"):
         candidate_paths = [
@@ -185,13 +193,22 @@ def copy_applier_script(base_dir, patch_dir):
         if getattr(sys, "frozen", False):
             candidate_paths.append(_bundled_base_dir() / binary_name)
             candidate_paths.append(_bundled_base_dir() / "bin" / binary_name)
+
+        found = None
         for candidate in candidate_paths:
             if candidate.exists():
-                shutil.copy2(candidate, patch_dir / binary_name)
+                found = candidate
                 break
 
+        if found:
+            # Always copy to Patch/
+            shutil.copy2(found, patch_dir / binary_name)
+            if copy_scripts:
+                # Copy to root so .py scripts at root can discover them
+                shutil.copy2(found, base_dir / binary_name)
 
-def build_patch_bundle(base_dir):
+
+def build_patch_bundle(base_dir, copy_scripts=False):
     old_dir = base_dir / "Old"
     new_dir = base_dir / "New"
     patch_dir = base_dir / "Patch"
@@ -274,8 +291,8 @@ def build_patch_bundle(base_dir):
         json.dumps(manifest, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    write_patch_instructions(patch_dir)
-    copy_applier_script(base_dir, patch_dir)
+    write_patch_instructions(patch_dir, copy_scripts)
+    copy_applier_script(base_dir, patch_dir, copy_scripts)
 
     print("\n补丁包生成完成！")
     print(f"- 变更文件: {changed_count}")
@@ -288,6 +305,12 @@ def main():
     parser = argparse.ArgumentParser(
         description="一个用于创建和应用二进制文件补丁的工具。",
         formatter_class=argparse.RawTextHelpFormatter,
+    )
+    parser.add_argument(
+        "--copy-scripts",
+        action="store_true",
+        default=False,
+        help="将 apply_patch.py / rollback_patch.py 释放到工作目录根（默认不释放）",
     )
     subparsers = parser.add_subparsers(dest="command", help="可用的命令")
 
@@ -315,12 +338,12 @@ def main():
         return
 
     if args.command == "bundle":
-        build_patch_bundle(Path(args.base_dir).resolve())
+        build_patch_bundle(Path(args.base_dir).resolve(), args.copy_scripts)
         return
 
     base_dir = Path.cwd()
     if init_workspace(base_dir):
-        build_patch_bundle(base_dir)
+        build_patch_bundle(base_dir, args.copy_scripts)
     pause_if_needed()
 
 
