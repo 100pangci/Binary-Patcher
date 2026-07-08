@@ -82,7 +82,8 @@ def main():
 
     if not patch_dir.exists():
         print(f"错误: 当前目录下未找到 Patch 文件夹: {patch_dir}")
-        print("请把 Patch 文件夹复制到旧版本根目录后，再运行 rollback_patch.py / rollback_patch.exe。")
+        print("请把 Patch 文件夹复制到旧版本根目录后，再运行 rollback_patch。")
+        print("（Release 用户请使用 rollback_patch.exe，Python 用户请运行 rollback_patch.py）")
         pause_and_exit(1)
 
     manifest = load_manifest(patch_dir)

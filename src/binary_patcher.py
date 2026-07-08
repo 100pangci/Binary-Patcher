@@ -150,9 +150,10 @@ def write_patch_instructions(patch_dir):
     instructions = (
         "这是由 binary_patcher 自动生成的整包补丁目录。\n\n"
         "使用方式：\n"
-        "1. 将整个 Patch 文件夹复制到旧版本根目录（Old）内。\n"
-        "2. 将 apply_patch.py 或 apply_patch.exe 放到旧版本根目录并运行。\n"
-        "3. 程序会按 manifest.json 和原始目录结构自动完成补丁应用。\n"
+        "1. 将整个 Patch 文件夹复制到旧版本根目录。\n"
+        "2. 将 apply_patch.py / rollback_patch.py 也放到旧版本根目录。\n"
+        "3. 运行 apply_patch.py（需 Python 环境）或下载 Release 中的 apply_patch.exe 双击运行。\n"
+        "4. 程序会按 manifest.json 和原始目录结构自动完成补丁应用。\n"
     )
     (patch_dir / INSTRUCTIONS_NAME).write_text(instructions, encoding="utf-8")
 
@@ -168,11 +169,11 @@ def _find_script(script_name):
     return None
 
 
-def copy_applier_script(patch_dir):
+def copy_applier_script(base_dir, patch_dir):
     for script_name in (APPLIER_SCRIPT_NAME, ROLLBACK_SCRIPT_NAME, HDIFFPATCH_HELPER_NAME):
         source = _find_script(script_name)
         if source:
-            shutil.copy2(source, patch_dir / script_name)
+            shutil.copy2(source, base_dir / script_name)
         else:
             print(f"警告: 未找到 {script_name}，请手动复制到补丁目录")
 
@@ -274,7 +275,7 @@ def build_patch_bundle(base_dir):
         encoding="utf-8",
     )
     write_patch_instructions(patch_dir)
-    copy_applier_script(patch_dir)
+    copy_applier_script(base_dir, patch_dir)
 
     print("\n补丁包生成完成！")
     print(f"- 变更文件: {changed_count}")

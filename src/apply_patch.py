@@ -108,7 +108,8 @@ def main():
 
     if not patch_dir.exists():
         print(f"错误: 当前目录下未找到 Patch 文件夹: {patch_dir}")
-        print("请把 Patch 文件夹复制到旧版本根目录后，再双击运行 apply_patch.py / apply_patch.exe。")
+        print("请把 Patch 文件夹复制到旧版本根目录后，再运行 apply_patch。")
+        print("（Release 用户请使用 apply_patch.exe，Python 用户请运行 apply_patch.py）")
         pause_and_exit(1)
 
     manifest = load_manifest(patch_dir)
@@ -189,7 +190,10 @@ def main():
 
     print()
     print("整包补丁应用完成！")
-    print("如果需要回滚，可使用同目录下的 rollback_patch.exe 恢复。")
+    if getattr(sys, "frozen", False):
+        print("如果需要回滚，请使用同目录下的 rollback_patch.exe 恢复。")
+    else:
+        print("如果需要回滚，请使用同目录下的 rollback_patch.py 恢复。")
     pause_and_exit(0)
 
 
