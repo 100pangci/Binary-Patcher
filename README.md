@@ -30,7 +30,8 @@
 │   ├─ hdiffpatch_utils.py   # HDiffPatch 工具查找与调用封装
 │   └─ legacy/               # 旧版实现 (bsdiff4)
 ├─ tests/
-│   └─ test_binary_patcher.py  # 45 个单元测试
+│   ├─ test_binary_patcher.py  # 45 个单元测试
+│   └─ test_integration.py     # 10 个全流程闭环集成测试
 ├─ .gitignore
 ├─ pyproject.toml            # 项目元数据 + ruff/pytest 配置
 ├─ requirements.txt
@@ -99,18 +100,56 @@
 - 对新增文件生成 `*.new`
 > 生成补丁时，程序会自动读取当前电脑的 CPU 线程数，默认会预留 1 个线程给系统，其余线程用于 HDiffPatch 多线程加速；如果机器只有 1 个线程，则仍至少使用 1 个线程运行。
 
+### CLI 参考
+
+`binary_patcher.exe` 支持以下用法：
+
+| 命令 | 说明 |
+|------|------|
+| `(无参数)` | 默认 workspace 模式，在当前目录自动创建 `Old/` / `New/` / `Patch/` 并生成补丁 |
+| `create <old> <new> <patch>` | 对两个单文件生成一个 `.patch` 补丁 |
+| `apply <old> <patch> <new>` | 对单文件应用补丁，输出新文件 |
+| `bundle [--base-dir .]` | 显式 workspace 模式，指定工作目录 |
+| `--copy-scripts` | 额外释放 `apply_patch.py` / `rollback_patch.py` 到工作目录根 |
+
+短选项仅需双击运行 `binary_patcher.exe` 即可开始 workspace 流程。
+
+### --copy-scripts 参数
+
+默认情况下不会释放 Python 脚本。如果你希望 Patch 包同时附带 `.py` 脚本（方便有 Python 的用户直接运行），可在运行时加参数：
+
+```powershell
+binary_patcher.exe --copy-scripts                # 默认 workspace 模式
+binary_patcher.exe bundle --copy-scripts --base-dir .   # 显式 bundle 模式
+```
+
+启用后，工作目录根会额外生成 `apply_patch.py`、`rollback_patch.py`、`hdiffpatch_utils.py`，用户可直接 `python apply_patch.py` 运行。**不推荐在正式发布中使用**，建议仅发布 `.exe`。
+
 ---
 
 ## 二、应用整包补丁
+
+### Release 用户（推荐）
 
 把以下内容复制到**旧版本程序根目录**：
 
 - 整个 `Patch/` 文件夹
 - `apply_patch.exe`
 
-然后双击运行：
+然后双击运行 `apply_patch.exe`。
 
-- `apply_patch.exe`
+### Python 用户
+
+如果补丁包附带 `.py` 脚本（生成时使用了 `--copy-scripts`），把以下内容复制到**旧版本程序根目录**：
+
+- 整个 `Patch/` 文件夹
+- `apply_patch.py`、`rollback_patch.py`、`hdiffpatch_utils.py`
+
+然后执行：
+
+```bash
+python apply_patch.py
+```
 
 程序会按照 `manifest.json` 自动：
 
@@ -124,14 +163,27 @@
 
 ## 三、回滚已经应用的补丁
 
+### Release 用户（推荐）
+
 如果你需要撤销已经打过的补丁，请在**旧版本程序根目录**准备：
 
 - 整个 `Patch/` 文件夹
 - `rollback_patch.exe`
 
-然后双击运行：
+然后双击运行 `rollback_patch.exe`。
 
-- `rollback_patch.exe`
+### Python 用户
+
+如果补丁包附带 `.py` 脚本，请在**旧版本程序根目录**准备：
+
+- 整个 `Patch/` 文件夹
+- `rollback_patch.py`
+
+然后执行：
+
+```bash
+python rollback_patch.py
+```
 
 程序会按 `manifest.json` 自动：
 
@@ -191,7 +243,7 @@ scripts\build.bat
 | Job | 环境 | 内容 |
 |-----|------|------|
 | **lint** | ubuntu | `ruff check src/ tests/` |
-| **test (3.10, 3.11, 3.12)** | ubuntu | `pytest tests/ -v`（45 项测试） |
+| **test (3.10, 3.11, 3.12)** | ubuntu | `pytest tests/ -v`（55 项测试） |
 
 ### 发布流水线 (`build.yml`)
 
