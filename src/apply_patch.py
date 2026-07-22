@@ -6,7 +6,7 @@ import sys
 import time
 from pathlib import Path
 
-from hdiffpatch_utils import run_hpatchz
+from hdiffpatch_utils import is_bundled, run_hpatchz
 
 
 MANIFEST_NAME = "manifest.json"
@@ -42,6 +42,11 @@ def resolve_safe_path(base_dir, relative_path):
 def validate_manifest(manifest):
     if not isinstance(manifest, dict):
         raise ValueError("manifest 格式错误: 应为 JSON 对象")
+
+    fmt = manifest.get("format", 1)
+    if not isinstance(fmt, int) or fmt != 1:
+        raise ValueError(f"不支持的 manifest 格式版本: {fmt}。当前工具仅支持格式版本 1。")
+
     for key in ("changed", "added", "deleted"):
         if not isinstance(manifest.get(key), list):
             raise ValueError(f"manifest 格式错误: '{key}' 应为数组")
@@ -108,7 +113,7 @@ def main():
 
     if not patch_dir.exists():
         print(f"错误: 当前目录下未找到 Patch 文件夹: {patch_dir}")
-        print("请把 Patch 文件夹复制到旧版本根目录后，再运行 apply_patch。")
+        print(f"请把 Patch 文件夹复制到旧版本根目录后，再运行 apply_patch{'exe' if is_bundled() else 'py'}。")
         print("（Release 用户请使用 apply_patch.exe，Python 用户请运行 apply_patch.py）")
         pause_and_exit(1)
 
@@ -190,7 +195,7 @@ def main():
 
     print()
     print("整包补丁应用完成！")
-    if getattr(sys, "frozen", False):
+    if is_bundled():
         print("如果需要回滚，请使用同目录下的 rollback_patch.exe 恢复。")
     else:
         print("如果需要回滚，请使用同目录下的 rollback_patch.py 恢复。")

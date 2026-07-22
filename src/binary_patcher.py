@@ -6,7 +6,10 @@ import shutil
 from pathlib import Path
 import sys
 
-from hdiffpatch_utils import _bundled_base_dir, run_hdiffz, run_hpatchz
+from hdiffpatch_utils import (
+    _bundled_base_dir, find_hdiffpatch_tool, is_bundled, run_hdiffz, run_hpatchz,
+    HDIFFZ_NAME, HPATCHZ_NAME,
+)
 
 
 WORKSPACE_DIRS = ("Old", "New", "Patch")
@@ -169,7 +172,7 @@ def _find_script(script_name):
     source = Path(__file__).with_name(script_name)
     if source.exists():
         return source
-    if getattr(sys, "frozen", False):
+    if is_bundled():
         source = _bundled_base_dir() / script_name
         if source.exists():
             return source
@@ -185,27 +188,15 @@ def copy_applier_script(base_dir, patch_dir, copy_scripts=False):
             else:
                 print(f"警告: 未找到 {script_name}，请手动复制到补丁目录")
 
-    for binary_name in ("hpatchz.exe", "hdiffz.exe"):
-        candidate_paths = [
-            Path(__file__).resolve().parent.parent / "bin" / binary_name,
-            Path.cwd() / "bin" / binary_name,
-        ]
-        if getattr(sys, "frozen", False):
-            candidate_paths.append(_bundled_base_dir() / binary_name)
-            candidate_paths.append(_bundled_base_dir() / "bin" / binary_name)
+    if copy_scripts:
+        for binary_name in (HPATCHZ_NAME, HDIFFZ_NAME):
+            try:
+                found = find_hdiffpatch_tool(binary_name)
+            except FileNotFoundError:
+                print(f"警告: 未找到 {binary_name}，请手动复制到补丁目录")
+                continue
 
-        found = None
-        for candidate in candidate_paths:
-            if candidate.exists():
-                found = candidate
-                break
-
-        if found:
-            # Always copy to Patch/
-            shutil.copy2(found, patch_dir / binary_name)
-            if copy_scripts:
-                # Copy to root so .py scripts at root can discover them
-                shutil.copy2(found, base_dir / binary_name)
+            shutil.copy2(found, base_dir / binary_name)
 
 
 def build_patch_bundle(base_dir, copy_scripts=False):
@@ -310,7 +301,7 @@ def main():
         "--copy-scripts",
         action="store_true",
         default=False,
-        help="将 apply_patch.py / rollback_patch.py 释放到工作目录根（默认不释放）",
+        help=f"将 apply_patch.{'exe' if is_bundled() else 'py'} / rollback_patch.{'exe' if is_bundled() else 'py'} 释放到工作目录根（默认不释放）",
     )
     subparsers = parser.add_subparsers(dest="command", help="可用的命令")
 

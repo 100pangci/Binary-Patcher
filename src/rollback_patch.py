@@ -3,6 +3,8 @@ import shutil
 import sys
 from pathlib import Path
 
+from hdiffpatch_utils import is_bundled
+
 MANIFEST_NAME = "manifest.json"
 BACKUP_SUFFIX = ".backup_before_patch"
 
@@ -82,7 +84,7 @@ def main():
 
     if not patch_dir.exists():
         print(f"错误: 当前目录下未找到 Patch 文件夹: {patch_dir}")
-        print("请把 Patch 文件夹复制到旧版本根目录后，再运行 rollback_patch。")
+        print(f"请把 Patch 文件夹复制到旧版本根目录后，再运行 rollback_patch{'exe' if is_bundled() else 'py'}。")
         print("（Release 用户请使用 rollback_patch.exe，Python 用户请运行 rollback_patch.py）")
         pause_and_exit(1)
 

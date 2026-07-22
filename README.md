@@ -44,14 +44,14 @@
 - `src/binary_patcher.py`：核心命令行工具
 - `src/apply_patch.py`：面向最终用户的自动补丁脚本
 - `src/rollback_patch.py`：面向最终用户的自动回滚脚本
-- `src/hdiffpatch_utils.py`：HDiffPatch 工具查找封装、线程数推荐、subprocess 超时控制
+- `src/hdiffpatch_utils.py`：HDiffPatch 工具查找封装、线程数推荐、subprocess 超时控制、`is_bundled()` 运行时检测（兼容 PyInstaller / Nuitka）
 - `scripts/build.py`：统一构建与发布整理脚本
 - `scripts/build.bat`：Windows 下一键构建入口
 
 ## 安全特性
 
 - **路径穿越防护**: 所有 manifest 中的路径均经过 `resolve_safe_path()` 校验，拒绝 `../` 逃逸
-- **Manifest 校验**: 加载时验证字段完整性和类型，拒绝格式错误的恶意清单
+- **Manifest 校验**: 加载时验证字段完整性和类型，拒绝格式错误的恶意清单；校验 `format` 版本号，拒绝不兼容的未来格式
 - **备份安全**: 多次打补丁时备份文件使用**时间戳后缀**，不再静默覆盖
 - **SHA256 校验**: 补丁应用前后均校验文件完整性，失败自动回滚并恢复备份
 
@@ -98,6 +98,9 @@
 - `manifest.json`
 - 与原目录结构一致的 `*.patch`
 - 对新增文件生成 `*.new`
+- `README.txt`（使用说明）
+
+> `Patch/` 目录仅包含补丁相关文件，不嵌入 `hdiffz.exe` / `hpatchz.exe`。应用补丁时使用单独的 `apply_patch.exe`（已内嵌二进制）或 `--copy-scripts` 释放的脚本 + 二进制文件。
 > 生成补丁时，程序会自动读取当前电脑的 CPU 线程数，默认会预留 1 个线程给系统，其余线程用于 HDiffPatch 多线程加速；如果机器只有 1 个线程，则仍至少使用 1 个线程运行。
 
 ### CLI 参考
@@ -123,7 +126,7 @@ binary_patcher.exe --copy-scripts                # 默认 workspace 模式
 binary_patcher.exe bundle --copy-scripts --base-dir .   # 显式 bundle 模式
 ```
 
-启用后，工作目录根会额外生成 `apply_patch.py`、`rollback_patch.py`、`hdiffpatch_utils.py`，用户可直接 `python apply_patch.py` 运行。**不推荐在正式发布中使用**，建议仅发布 `.exe`。
+启用后，工作目录根会额外生成 `apply_patch.py`、`rollback_patch.py`、`hdiffpatch_utils.py`，以及 `hdiffz.exe` / `hpatchz.exe` 二进制文件，用户可直接 `python apply_patch.py` 运行。**不推荐在正式发布中使用**，建议仅发布 `.exe`。
 
 ---
 
@@ -217,7 +220,7 @@ GitHub Release / GitHub Actions 产物中会提供：
 scripts\build.bat
 ```
 
-构建脚本会自动下载 HDiffPatch 最新版 Windows 64 位发行包到 `bin/`，并在使用 **Nuitka** 打包 `binary_patcher.exe` / `apply_patch.exe` / `rollback_patch.exe` 时一并嵌入。
+构建脚本始终从 GitHub 拉取 HDiffPatch 最新版 Windows 64 位发行包到 `bin/`（不依赖本地缓存），并在使用 **Nuitka** 打包 `binary_patcher.exe` / `apply_patch.exe` / `rollback_patch.exe` 时一并嵌入。
 
 构建后的工具包包含：
 

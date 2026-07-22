@@ -10,10 +10,17 @@ HPATCHZ_NAME = "hpatchz.exe" if os.name == "nt" else "hpatchz"
 DEFAULT_HDIFFZ_THREADS = 4
 
 
-def _bundled_base_dir() -> Path:
+def is_bundled() -> bool:
     if getattr(sys, "frozen", False):
-        # PyInstaller uses _MEIPASS, while Nuitka onefile exposes bundled files
-        # relative to module paths after extraction.
+        return True
+    try:
+        return __compiled__  # type: ignore[name-defined]  # Nuitka
+    except NameError:
+        return False
+
+
+def _bundled_base_dir() -> Path:
+    if is_bundled():
         return Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
     return Path(__file__).resolve().parent.parent
 

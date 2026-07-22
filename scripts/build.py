@@ -134,12 +134,7 @@ def _download_and_extract_hdiffpatch(download_url: str, display_name: str) -> bo
 def ensure_hdiffpatch_binaries() -> list[Path]:
     BIN_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Step 1: check if binaries already exist locally
-    if all((BIN_DIR / name).exists() for name in ["hdiffz.exe", "hpatchz.exe"]):
-        print("[INFO] HDiffPatch binaries already exist locally, skipping download")
-        return [BIN_DIR / "hdiffz.exe", BIN_DIR / "hpatchz.exe"]
-
-    # Step 2: try GitHub API (with token if available)
+    # Step 1: try GitHub API (with token if available)
     release = _make_github_request(HDIFFPATCH_REPO_API)
     if release is not None:
         assets = release.get("assets", [])
@@ -155,16 +150,22 @@ def ensure_hdiffpatch_binaries() -> list[Path]:
         else:
             print("[WARN] No windows64.zip asset found in latest release")
 
-    # Step 3: fallback - scrape the releases page
+    # Step 2: fallback - scrape the releases page
     print("[INFO] Falling back to scraping releases page...")
     fallback_url = _get_fallback_download_url()
     if fallback_url and _download_and_extract_hdiffpatch(fallback_url, "fallback"):
         return [BIN_DIR / "hdiffz.exe", BIN_DIR / "hpatchz.exe"]
 
-    # Step 4: last resort - use a well-known URL
-    KNOWN_RELEASE = "https://github.com/sisong/HDiffPatch/releases/download/v4.5.4/HDiffPatch_win64.zip"
-    print(f"[INFO] Using known release URL: {KNOWN_RELEASE}")
-    if _download_and_extract_hdiffpatch(KNOWN_RELEASE, "v4.5.4"):
+    # Step 3: last resort - GitHub latest/download redirect (always points to latest)
+    FALLBACK_URL = "https://github.com/sisong/HDiffPatch/releases/latest/download/HDiffPatch_win64.zip"
+    print(f"[INFO] Using GitHub latest release URL: {FALLBACK_URL}")
+    if _download_and_extract_hdiffpatch(FALLBACK_URL, "latest"):
+        return [BIN_DIR / "hdiffz.exe", BIN_DIR / "hpatchz.exe"]
+
+    # Step 4: if all downloads failed, try locally cached binaries
+    if all((BIN_DIR / name).exists() for name in ["hdiffz.exe", "hpatchz.exe"]):
+        print("[WARN] All download attempts failed. Using locally cached binaries.")
+        print("[WARN] Consider manually updating them from https://github.com/sisong/HDiffPatch/releases")
         return [BIN_DIR / "hdiffz.exe", BIN_DIR / "hpatchz.exe"]
 
     raise RuntimeError(
