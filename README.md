@@ -5,6 +5,8 @@
 
 这是一个用于生成和应用二进制补丁项目，并支持整目录补丁工作流。项目现已统一通过 HDiffPatch (`hdiffz` / `hpatchz`) 处理补丁生成与应用。
 
+该项目因架构问题已不再维护。体验最新请看：[Rust重构版](https://github.com/100pangci/binary_patcher_rs)
+
 支持：
 
 - 生成整目录补丁
